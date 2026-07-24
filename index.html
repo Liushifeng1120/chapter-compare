@@ -547,6 +547,10 @@ function strictMatch(recParam, ruleParam) {
   const b = normalizeText(ruleParam);
   return a === b;
 }
+
+// 费用类规则：C列（收费账户 或 业务机构类别）必须与B列参数出现在同一条记录中，
+// 避免「管理人」下的通用费项参数被误算入「销售服务费/其他费用」等章节。
+const FEE_RULES = { '管理费': ['管理费收取账户','管理人'], '托管费': ['托管费收取账户','托管人'], '外包费': ['行政服务费收取账户','行政服务机构'], '投资顾问费': ['投资顾问费账户','投资顾问'], '销售服务费': ['销售服务费账户','销售机构'], '其他费用': ['募集监督服务费账户','募集监督机构'] };
 function fuzzyMatchCategory(recCategory, ruleCategory) {
   // C 列默认也使用严格匹配；仅当业务类别本身带有子分类描述（如「管理费收取账户」 vs 「管理人」）时可扩展
   return strictMatch(recCategory, ruleCategory);
@@ -651,7 +655,33 @@ function matchRuleRow(ruleA, ruleBList, ruleCList, ruleD, records) {
   const matchedMap = {};
   for (const r of bMatched) matchedMap[r.row_num] = r;
   for (const r of cMatched) matchedMap[r.row_num] = r;
-  const matchedRecords = Object.values(matchedMap);
+  let matchedRecords = Object.values(matchedMap);
+
+  // 费用类规则：B列参数必须和对应的C列业务类别出现在同一条记录中，避免跨类别误匹配
+  if (FEE_RULES[ruleA]) {
+    const [acct, entity] = FEE_RULES[ruleA];
+    const feeMatched = [];
+    const feeTriggeredB = []; const feeTriggeredC = [];
+    for (const r of matchedRecords) {
+      const cIsAcct = strictMatch(r.category, acct);
+      const cIsEntity = strictMatch(r.category, entity);
+      const bMatches = ruleBList.some(bp => strictMatch(r.param_name, bp));
+      if (cIsAcct || (cIsEntity && bMatches)) {
+        feeMatched.push(r);
+        if (cIsAcct && !feeTriggeredC.includes(acct)) feeTriggeredC.push(acct);
+        if (cIsEntity && !feeTriggeredC.includes(entity)) feeTriggeredC.push(entity);
+        if (bMatches) {
+          for (const bp of ruleBList) {
+            if (strictMatch(r.param_name, bp) && !feeTriggeredB.includes(bp)) { feeTriggeredB.push(bp); break; }
+          }
+        }
+      }
+    }
+    matchedRecords = feeMatched;
+    triggeredB = feeTriggeredB;
+    triggeredC = feeTriggeredC;
+  }
+
   const result = { chapter: getDisplayName(ruleA), rule_a: ruleA, decision: '不选', reason: '', matched_records: matchedRecords, triggered_by_b: triggeredB, triggered_by_c: triggeredC, rule_b: ruleBList, rule_c: ruleCList, rule_d: ruleD };
   if (matchedRecords.length === 0) { result.decision = '不选'; result.reason = '留痕记录中未找到B列参数或C列类别的变更'; return result; }
   const [decision, reason] = decide(ruleA, ruleBList, ruleCList, ruleD, matchedRecords, triggeredB, triggeredC);
@@ -694,9 +724,8 @@ function decide(ruleA, bList, cList, dText, matchedRecords, triggeredB, triggere
   }
   if (ruleA === '成立条件') return ['可选', '需人工判断产品是否已成立。已成立产品一般选「认购相关条款」而非此章节。当前B列匹配到：' + bNames];
 
-  const feeRules = { '管理费': ['管理费收取账户','管理人'], '托管费': ['托管费收取账户','托管人'], '外包费': ['行政服务费收取账户','行政服务机构'], '投资顾问费': ['投资顾问费账户','投资顾问'], '销售服务费': ['销售服务费账户','销售机构'], '其他费用': ['募集监督服务费账户','募集监督机构'] };
-  if (feeRules[ruleA]) {
-    const [acct, entity] = feeRules[ruleA];
+  if (FEE_RULES[ruleA]) {
+    const [acct, entity] = FEE_RULES[ruleA];
     if (triggeredC.some(c => strictMatch(c, acct))) {
       if (ruleA === '托管费') return ['可选', '「' + acct + '」变更 → 建议勾选，但不强制'];
       return ['必选', '「' + acct + '」变更 → 必选'];
