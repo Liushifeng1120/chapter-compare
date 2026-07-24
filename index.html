@@ -200,6 +200,22 @@ textarea:focus { border-color: var(--primary); }
 .col-missing .col-header .count { background: var(--danger); }
 .col-body { padding: 10px; max-height: 600px; overflow-y: auto; }
 
+.no-param-section { margin-top: 20px; background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; display: none; }
+.no-param-section .no-param-header {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--info-bg);
+  color: var(--info);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.no-param-section .no-param-header .count { display: inline-block; min-width: 24px; height: 24px; line-height: 24px; border-radius: 12px; text-align: center; font-size: 12px; color: #fff; background: var(--info); }
+.no-param-section .no-param-body { padding: 10px; }
+.no-param-section .no-param-item { padding: 8px 12px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--text-secondary); }
+.no-param-section .no-param-item:last-child { margin-bottom: 0; }
+
 .chapter-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; transition: box-shadow .2s; }
 .chapter-item:hover { box-shadow: var(--shadow); }
 .chapter-header {
@@ -287,6 +303,11 @@ textarea:focus { border-color: var(--primary); }
       <div class="col-header">❌ 漏选章节 <span class="count" id="countMissing">0</span></div>
       <div class="col-body" id="colMissing"></div>
     </div>
+  </div>
+
+  <div class="no-param-section" id="noParamSection" style="display:none">
+    <div class="no-param-header">📋 不涉及参数变更的章节 <span class="count" id="countNoParam">0</span></div>
+    <div class="no-param-body" id="noParamBody"></div>
   </div>
 </div>
 
@@ -711,6 +732,7 @@ function runComparison() {
 
   document.getElementById('loading').classList.add('show');
   document.getElementById('resultColumns').style.display = 'none';
+  document.getElementById('noParamSection').style.display = 'none';
   document.getElementById('statsBar').style.display = 'none';
 
   setTimeout(() => {
@@ -741,6 +763,18 @@ function executeComparison(userText) {
       if (!userInputMap.get(normalized).includes(trimmed)) userInputMap.get(normalized).push(trimmed);
     }
   }
+
+  // 不涉及参数变更的章节：这些章节不参与比对，用户勾选后统一归入独立区域展示
+  const NO_PARAM_CHAPTERS = new Set(['基金当事人的权利和义务','基金份额持有人大会及日常机构','投资比例限制','投资范围变更程序','资金清算交收安排','越权交易处理','基金合同的变更、终止与基金财产清算']);
+  const noParamChapters = []; const noParamInputMap = new Map();
+  for (let i = userChapters.length - 1; i >= 0; i--) {
+    if (NO_PARAM_CHAPTERS.has(userChapters[i])) {
+      noParamChapters.push(userChapters[i]);
+      if (userInputMap.has(userChapters[i])) { noParamInputMap.set(userChapters[i], userInputMap.get(userChapters[i])); userInputMap.delete(userChapters[i]); }
+      userChapters.splice(i, 1);
+    }
+  }
+  noParamChapters.reverse(); // 恢复原始顺序
 
   const allResults = [];
   for (const [ruleA, ruleB, ruleC, ruleD] of RULES_DATA) {
@@ -780,7 +814,7 @@ function executeComparison(userText) {
     }
   }
 
-  return { consistent, consistentOptional, superfluous, userUnknown, missing, missingOptional, allResults, recordsCount: traceRecords.length, changedCount: traceRecords.filter(r => r.changed).length, toolMustCount: toolMust.length, userChapters, userInputMap, records: traceRecords };
+  return { consistent, consistentOptional, superfluous, userUnknown, missing, missingOptional, allResults, recordsCount: traceRecords.length, changedCount: traceRecords.filter(r => r.changed).length, toolMustCount: toolMust.length, userChapters, userInputMap, noParamChapters, noParamInputMap, records: traceRecords };
 }
 
 // =================================================================
@@ -788,7 +822,7 @@ function executeComparison(userText) {
 // =================================================================
 function renderResults(result) {
   for (const r of result.allResults) { r.user_aliases = result.userInputMap.get(r.chapter) || []; }
-  document.getElementById('statsBar').innerHTML = '<span class="stat-item stat-total">留痕记录: ' + result.recordsCount + ' 行 (' + result.changedCount + ' 行变更)</span><span class="stat-item stat-must">工具判为必选: ' + result.toolMustCount + ' 个章节</span><span class="stat-item stat-changed">用户输入: ' + result.userChapters.length + ' 个章节</span>';
+  document.getElementById('statsBar').innerHTML = '<span class="stat-item stat-total">留痕记录: ' + result.recordsCount + ' 行 (' + result.changedCount + ' 行变更)</span><span class="stat-item stat-must">工具判为必选: ' + result.toolMustCount + ' 个章节</span><span class="stat-item stat-changed">用户输入: ' + (result.userChapters.length + result.noParamChapters.length) + ' 个章节</span>' + (result.noParamChapters.length ? '<span class="stat-item" style="background:var(--info-bg);color:var(--info)">不涉及参数变更: ' + result.noParamChapters.length + ' 个</span>' : '');
   document.getElementById('statsBar').style.display = 'flex';
 
   const colConsistent = document.getElementById('colConsistent');
@@ -809,6 +843,22 @@ function renderResults(result) {
   colMissing.innerHTML = missItems.length ? missItems.join('') : '<div class="empty-state">无漏选章节</div>';
 
   document.getElementById('resultColumns').style.display = 'grid';
+
+  // 不涉及参数变更的章节
+  const noParamSection = document.getElementById('noParamSection');
+  const noParamBody = document.getElementById('noParamBody');
+  const countNoParam = document.getElementById('countNoParam');
+  if (result.noParamChapters.length > 0) {
+    countNoParam.textContent = result.noParamChapters.length;
+    noParamBody.innerHTML = result.noParamChapters.map(ch => {
+      const aliases = (result.noParamInputMap.get(ch) || []).filter(a => a !== ch);
+      const aliasSuffix = aliases.length ? ' <span style="font-size:11px;color:var(--text-secondary)">（用户输入：' + aliases.map(a => escHtml(a)).join(' / ') + '）</span>' : '';
+      return '<div class="no-param-item">📌 ' + escHtml(ch) + aliasSuffix + '</div>';
+    }).join('');
+    noParamSection.style.display = 'block';
+  } else {
+    noParamSection.style.display = 'none';
+  }
 }
 
 function renderChapterItem(r, label, showDetail) {
@@ -863,6 +913,16 @@ function exportResult() {
     rows3.push([r.chapter, r.decision, r.reason, recs]);
   }
   sheets.push({ name: '漏选章节', rows: rows3 });
+
+  if (lastResult.noParamChapters.length > 0) {
+    const rows4 = [['变更章节','说明']];
+    for (const ch of lastResult.noParamChapters) {
+      const aliases = (lastResult.noParamInputMap.get(ch) || []).filter(a => a !== ch);
+      rows4.push([ch, '不涉及参数变更' + (aliases.length ? '（用户输入：' + aliases.join(', ') + '）' : '')]);
+    }
+    sheets.push({ name: '不涉及参数变更的章节', rows: rows4 });
+  }
+
   exportCSV(sheets);
 }
 
