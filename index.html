@@ -676,10 +676,10 @@ function decide(ruleA, bList, cList, dText, matchedRecords, triggeredB, triggere
   const feeRules = { '管理费': ['管理费收取账户','管理人'], '托管费': ['托管费收取账户','托管人'], '外包费': ['行政服务费收取账户','行政服务机构'], '投资顾问费': ['投资顾问费账户','投资顾问'], '销售服务费': ['销售服务费账户','销售机构'], '其他费用': ['募集监督服务费账户','募集监督机构'] };
   if (feeRules[ruleA]) {
     const [acct, entity] = feeRules[ruleA];
-    if (triggeredC.some(c => c.includes(acct))) return ['必选', '「' + acct + '」变更 → 必选'];
-    if (triggeredC.some(c => c.includes(entity)) && hasB) return ['必选', '「' + entity + '」类别下参数变更（' + bNames + '） → 必选'];
-    if (hasB) return ['必选', 'B列参数变更（' + bNames + '） → 必选（建议复核C列是否匹配）'];
-    return ['可选', '匹配到C列变更，但非收费账户 — 建议人工复核'];
+    if (triggeredC.some(c => strictMatch(c, acct))) return ['必选', '「' + acct + '」变更 → 必选'];
+    if (triggeredC.some(c => strictMatch(c, entity)) && hasB) return ['必选', '「' + entity + '」类别下参数变更（' + bNames + '） → 必选'];
+    if (hasB) return ['不选', 'B列参数变更（' + bNames + '）但C列未出现「' + entity + '」或「' + acct + '」，不满足条件'];
+    return ['不选', '未匹配到C列对应业务类别'];
   }
   if (ruleA === '投资顾问') { if (triggeredB.includes('投资顾问服务')) return ['必选', '「投资顾问服务」变更 → 必选']; if (triggeredC.includes('投资顾问') && triggeredB.includes('机构库名称')) return ['必选', '业务类别「投资顾问」+ 参数「机构库名称」变更 → 必选']; if (hasB) return ['可选', 'B列参数变更（' + bNames + '）但不满足D列精确条件 → 建议人工复核']; return ['不选', '未匹配到D列要求的条件']; }
   if (ruleA === '投资经理') { if (triggeredC.includes('基金经理') && hasB) return ['必选', '类别「基金经理」下参数变更（' + bNames + '） → 必选']; return ['不选', '未匹配到类别「基金经理」的变更']; }
@@ -746,11 +746,36 @@ function executeComparison(userText) {
   const toolMust = allResults.filter(r => r.decision === '必选').map(r => r.chapter);
   const userSet = new Set(userChapters);
   const consistent = allResults.filter(r => userSet.has(r.chapter) && r.decision === '必选');
-  const consistentOptional = allResults.filter(r => userSet.has(r.chapter) && r.decision === '可选');
-  const superfluous = allResults.filter(r => userSet.has(r.chapter) && r.decision === '不选');
+  let consistentOptional = allResults.filter(r => userSet.has(r.chapter) && r.decision === '可选');
+  let superfluous = allResults.filter(r => userSet.has(r.chapter) && r.decision === '不选');
   const userUnknown = userChapters.filter(ch => !allResults.some(r => r.chapter === ch));
   const missing = allResults.filter(r => !userSet.has(r.chapter) && r.decision === '必选');
   const missingOptional = allResults.filter(r => !userSet.has(r.chapter) && r.decision === '可选');
+
+  // 开放式转封闭式例外：当留痕记录中存在「产品运作方式」由「开放式」变更为「封闭式」时，
+  // 用户勾选下列章节即使没有对应留痕记录，也视为合理，不判为多余。
+  const OPEN_TO_CLOSED_EXCEPTION = new Set(['固定开放日','临时开放日','锁定期','一般申赎条款','申购费用','赎回费用','巨额赎回','其他条款']);
+  function isOpenToClosedChange(records) {
+    for (const r of records) {
+      if (r.changed && strictMatch(r.param_name, '产品运作方式')) {
+        const old = normalizeText(r.old_value);
+        const nw = normalizeText(r.new_value);
+        if (old.includes('开放式') && nw.includes('封闭式')) return true;
+      }
+    }
+    return false;
+  }
+  if (isOpenToClosedChange(traceRecords)) {
+    for (let i = superfluous.length - 1; i >= 0; i--) {
+      const r = superfluous[i];
+      if (OPEN_TO_CLOSED_EXCEPTION.has(r.chapter)) {
+        r.decision = '可选';
+        r.reason = '产品运作方式由开放式变更为封闭式，该章节勾选视为合理';
+        consistentOptional.push(r);
+        superfluous.splice(i, 1);
+      }
+    }
+  }
 
   return { consistent, consistentOptional, superfluous, userUnknown, missing, missingOptional, allResults, recordsCount: traceRecords.length, changedCount: traceRecords.filter(r => r.changed).length, toolMustCount: toolMust.length, userChapters, userInputMap, records: traceRecords };
 }
