@@ -707,7 +707,11 @@ function decide(ruleA, bList, cList, dText, matchedRecords, triggeredB, triggere
   }
   if (ruleA === '投资顾问') { if (triggeredB.includes('投资顾问服务')) return ['必选', '「投资顾问服务」变更 → 必选']; if (triggeredC.includes('投资顾问') && triggeredB.includes('机构库名称')) return ['必选', '业务类别「投资顾问」+ 参数「机构库名称」变更 → 必选']; if (hasB) return ['可选', 'B列参数变更（' + bNames + '）但不满足D列精确条件 → 建议人工复核']; return ['不选', '未匹配到D列要求的条件']; }
   if (ruleA === '投资经理') { if (triggeredC.includes('基金经理') && hasB) return ['必选', '类别「基金经理」下参数变更（' + bNames + '） → 必选']; return ['不选', '未匹配到类别「基金经理」的变更']; }
-  if (ruleA === '变更管理人') { if (triggeredC.includes('管理人') && triggeredB.includes('管理人')) return ['必选', '类别「管理人」且参数「管理人」变更 → 必选']; return ['不选', '类别和参数不满足「管理人+管理人」同时变更的条件']; }
+  if (ruleA === '变更管理人') {
+    const managerRec = matchedRecords.find(r => strictMatch(r.category, '管理人') && strictMatch(r.param_name, '管理人'));
+    if (managerRec && !isEmpty(managerRec.old_value) && !isEmpty(managerRec.new_value)) return ['必选', '业务类别「管理人」且参数名称「管理人」同时变更，且修改前、修改后均有值 → 必选'];
+    return ['不选', '未满足「业务类别=管理人 + 参数名称=管理人 + 修改前/后均有值」的条件'];
+  }
   if (ruleA === '估值业绩报酬转TA业绩报酬') { for (const r of matchedRecords) { if (r.param_name === '业绩报酬计提模式' && r.old_value.includes('估值计提') && r.new_value.includes('TA计提')) return ['必选', '「业绩报酬计提模式」由估值计提变更为TA计提 → 必选']; } return ['可选', '「业绩报酬计提模式」有变更但不满足「估值计提→TA计提」路径，建议人工复核']; }
   if (ruleA === '增加建仓日且未约定建仓日期') { for (const r of matchedRecords) { if (r.param_name === '建仓日前参与份额初始水位线' && isEmpty(r.old_value) && !isEmpty(r.new_value)) return ['必选', '「建仓日前参与份额初始水位线」由空值变更为有值 → 必选']; } return ['不选', '参数未满足「空值→有值」条件']; }
   if (ruleA === '平层转分级') { let hasLevel = false, hasIsLevel = false; for (const r of matchedRecords) { if (r.param_name === '产品分级情况' && r.new_value.includes('费率分类')) hasLevel = true; if (r.param_name === '产品结构是否分级' && r.new_value === '是') hasIsLevel = true; } if (hasLevel && hasIsLevel) return ['必选', '「产品分级情况」→费率分类 +「产品结构是否分级」→是 → 必选']; if (hasB) return ['可选', '相关参数有变更但不满足平层转分级的精确条件 → 建议人工复核']; return ['不选', '未匹配到平层转分级的变更条件']; }
