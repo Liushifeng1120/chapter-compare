@@ -519,10 +519,16 @@ function cleanInput(s) {
     .replace(/[,，]/g, function(m) { return m; }) // 保留，便于后续识别
     .trim();
 }
-function fuzzyMatch(recParam, ruleParam) {
+function strictMatch(recParam, ruleParam) {
+  // B/C 列严格匹配：规范化（统一括号、去除空白）后必须完全相等
+  // 不允许子串匹配，避免「业绩报酬账户（管理人）」「管理人及其员工持有期控制」等被误判为「管理人」
   const a = normalizeText(recParam);
   const b = normalizeText(ruleParam);
-  return a === b || a.includes(b);
+  return a === b;
+}
+function fuzzyMatchCategory(recCategory, ruleCategory) {
+  // C 列默认也使用严格匹配；仅当业务类别本身带有子分类描述（如「管理费收取账户」 vs 「管理人」）时可扩展
+  return strictMatch(recCategory, ruleCategory);
 }
 
 // =================================================================
@@ -568,7 +574,7 @@ function loadTraceData(rows) {
   traceColumns = {};
   for (let i = 0; i < header.length; i++) {
     const hl = header[i].toLowerCase().replace(/\s/g, '');
-    if (/业务类别|类别/.test(hl)) traceColumns.category = i;
+    if (hl === '业务类别' || (hl === '类别' && traceColumns.category === undefined)) traceColumns.category = i;
     else if (/参数名称|参数名/.test(hl)) traceColumns.param_name = i;
     else if (/修改前|原值|旧值|变更前/.test(hl)) traceColumns.old_value = i;
     else if (/修改后|现值|新值|变更后/.test(hl)) traceColumns.new_value = i;
@@ -612,13 +618,13 @@ function matchRuleRow(ruleA, ruleBList, ruleCList, ruleD, records) {
   const bMatched = []; const triggeredB = [];
   for (const rec of changed) {
     for (const bp of ruleBList) {
-      if (fuzzyMatch(rec.param_name, bp)) { bMatched.push(rec); if (!triggeredB.includes(bp)) triggeredB.push(bp); break; }
+      if (strictMatch(rec.param_name, bp)) { bMatched.push(rec); if (!triggeredB.includes(bp)) triggeredB.push(bp); break; }
     }
   }
   const cMatched = []; const triggeredC = [];
   for (const rec of changed) {
     for (const cp of ruleCList) {
-      if (rec.category && fuzzyMatch(rec.category, cp)) { cMatched.push(rec); if (!triggeredC.includes(cp)) triggeredC.push(cp); break; }
+      if (rec.category && strictMatch(rec.category, cp)) { cMatched.push(rec); if (!triggeredC.includes(cp)) triggeredC.push(cp); break; }
     }
   }
   const matchedMap = {};
