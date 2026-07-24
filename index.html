@@ -676,7 +676,10 @@ function decide(ruleA, bList, cList, dText, matchedRecords, triggeredB, triggere
   const feeRules = { '管理费': ['管理费收取账户','管理人'], '托管费': ['托管费收取账户','托管人'], '外包费': ['行政服务费收取账户','行政服务机构'], '投资顾问费': ['投资顾问费账户','投资顾问'], '销售服务费': ['销售服务费账户','销售机构'], '其他费用': ['募集监督服务费账户','募集监督机构'] };
   if (feeRules[ruleA]) {
     const [acct, entity] = feeRules[ruleA];
-    if (triggeredC.some(c => strictMatch(c, acct))) return ['必选', '「' + acct + '」变更 → 必选'];
+    if (triggeredC.some(c => strictMatch(c, acct))) {
+      if (ruleA === '托管费') return ['可选', '「' + acct + '」变更 → 建议勾选，但不强制'];
+      return ['必选', '「' + acct + '」变更 → 必选'];
+    }
     if (triggeredC.some(c => strictMatch(c, entity)) && hasB) return ['必选', '「' + entity + '」类别下参数变更（' + bNames + '） → 必选'];
     if (hasB) return ['不选', 'B列参数变更（' + bNames + '）但C列未出现「' + entity + '」或「' + acct + '」，不满足条件'];
     return ['不选', '未匹配到C列对应业务类别'];
