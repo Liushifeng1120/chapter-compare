@@ -61,9 +61,12 @@ body {
 }
 .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
-.header { text-align: center; padding: 24px 0 16px; }
+.header { text-align: center; padding: 24px 0 12px; }
 .header h1 { font-size: 26px; font-weight: 700; color: var(--primary); }
 .header p { font-size: 14px; color: var(--text-secondary); margin-top: 4px; }
+.usage-note { max-width: 900px; margin: 10px auto 0; padding: 10px 14px; background: var(--info-bg); border-left: 3px solid var(--info); border-radius: 6px; font-size: 12px; color: var(--text-secondary); text-align: left; line-height: 1.7; }
+.usage-note ol { margin: 0; padding-left: 18px; }
+.usage-note li { margin-bottom: 4px; }
 
 .input-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; align-items: stretch; max-height: calc(100vh - 160px); min-height: 0; }
 @media (max-width: 768px) { .input-panel { grid-template-columns: 1fr; max-height: none; } }
@@ -261,6 +264,13 @@ textarea:focus { border-color: var(--primary); }
   <div class="header">
     <h1>📋 变更章节自动比对</h1>
     <p>内置49条规则 · 逐行独立判定 · 不可跨行比对 · 完全离线可用</p>
+    <div class="usage-note">
+      <ol>
+        <li>老产品补录的参数无法识别，对比后请自行判断是否需要加章节；</li>
+        <li>不涉及参数修改的章节（基金当事人的权利和义务、基金份额持有人大会及日常机构、投资比例限制、投资范围变更程序、基金投资其他、资金清算交收安排、越权交易处理），请自行比对；</li>
+        <li>估值方法，预警平仓机制，基金合同的变更、终止与基金财产清算，有些产品会有参数修改，因此不放在不涉及修改项下，对比后需自行判断。</li>
+      </ol>
+    </div>
   </div>
 
   <div class="input-panel">
