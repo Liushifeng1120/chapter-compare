@@ -310,7 +310,7 @@ textarea:focus { border-color: var(--primary); }
   </div>
 
   <div class="no-param-section" id="noParamSection" style="display:none">
-    <div class="no-param-header">📋 不涉及参数变更的章节 <span class="count" id="countNoParam">0</span></div>
+    <div class="no-param-header">📋 不涉及参数修改的章节 <span class="count" id="countNoParam">0</span></div>
     <div class="no-param-body" id="noParamBody"></div>
   </div>
 </div>
@@ -412,7 +412,7 @@ const RULES_DATA = [
   ["预警平仓机制", ["预警线","止损线"], [], "B任一项变更，则必选"],
   ["投资顾问", ["投资顾问服务","机构库名称"], ["投资顾问"], "①B项里面「投资顾问服务」变更，则必选；②当且仅当C为「投资顾问」且B项「机构库名称」变更时，必选"],
   ["基金投资其他", ["业绩比较基准"], [], "B任一项变更，则必选"],
-  ["投资经理", ["联系人姓名","现任职情况","此前履历"], ["基金经理"], "C项为「基金经理」，且B项下任一项变更，则必选"],
+  ["投资经理", ["联系人姓名","此前履历"], ["基金经理"], "C项为「基金经理」，且B项下联系人姓名或此前履历变更，则必选"],
   ["资金清算交收安排", [], [], ""],
   ["越权交易处理", [], [], ""],
   ["估值日", ["估值频率","估值核对频率","合同约定估值时效","估值基准日"], [], "B任一项变更，则必选"],
@@ -740,7 +740,7 @@ function decide(ruleA, bList, cList, dText, matchedRecords, triggeredB, triggere
     return ['不选', '未匹配到C列对应业务类别'];
   }
   if (ruleA === '投资顾问') { if (triggeredB.includes('投资顾问服务')) return ['必选', '「投资顾问服务」变更 → 必选']; if (triggeredC.includes('投资顾问') && triggeredB.includes('机构库名称')) return ['必选', '业务类别「投资顾问」+ 参数「机构库名称」变更 → 必选']; if (hasB) return ['可选', 'B列参数变更（' + bNames + '）但不满足D列精确条件 → 建议人工复核']; return ['不选', '未匹配到D列要求的条件']; }
-  if (ruleA === '投资经理') { if (triggeredC.includes('基金经理') && hasB) return ['必选', '类别「基金经理」下参数变更（' + bNames + '） → 必选']; return ['不选', '未匹配到类别「基金经理」的变更']; }
+  if (ruleA === '投资经理') { if (triggeredC.includes('基金经理') && hasB) return ['必选', '类别「基金经理」下「联系人姓名」或「此前履历」变更 → 必选']; return ['不选', '未匹配到类别「基金经理」下的「联系人姓名」或「此前履历」变更']; }
   if (ruleA === '变更管理人') {
     const managerRec = matchedRecords.find(r => strictMatch(r.category, '管理人') && strictMatch(r.param_name, '管理人'));
     if (managerRec && !isEmpty(managerRec.old_value) && !isEmpty(managerRec.new_value)) return ['必选', '业务类别「管理人」且参数名称「管理人」同时变更，且修改前、修改后均有值 → 必选'];
@@ -802,8 +802,8 @@ function executeComparison(userText) {
     }
   }
 
-  // 不涉及参数变更的章节：这些章节不参与比对，用户勾选后统一归入独立区域展示
-  const NO_PARAM_CHAPTERS = new Set(['基金当事人的权利和义务','基金份额持有人大会及日常机构','投资比例限制','投资范围变更程序','资金清算交收安排','越权交易处理','基金合同的变更、终止与基金财产清算']);
+  // 不涉及参数修改的章节：这些章节不参与比对，用户勾选后统一归入独立区域展示
+  const NO_PARAM_CHAPTERS = new Set(['基金当事人的权利和义务','基金份额持有人大会及日常机构','投资比例限制','投资范围变更程序','资金清算交收安排','越权交易处理','基金投资其他']);
   const noParamChapters = []; const noParamInputMap = new Map();
   for (let i = userChapters.length - 1; i >= 0; i--) {
     if (NO_PARAM_CHAPTERS.has(userChapters[i])) {
@@ -877,7 +877,7 @@ function executeComparison(userText) {
 // =================================================================
 function renderResults(result) {
   for (const r of result.allResults) { r.user_aliases = result.userInputMap.get(r.chapter) || []; }
-  document.getElementById('statsBar').innerHTML = '<span class="stat-item stat-total">留痕记录: ' + result.recordsCount + ' 行 (' + result.changedCount + ' 行变更)</span><span class="stat-item stat-must">工具判为必选: ' + result.toolMustCount + ' 个章节</span><span class="stat-item stat-changed">用户输入: ' + (result.userChapters.length + result.noParamChapters.length) + ' 个章节</span>' + (result.noParamChapters.length ? '<span class="stat-item" style="background:var(--info-bg);color:var(--info)">不涉及参数变更: ' + result.noParamChapters.length + ' 个</span>' : '');
+  document.getElementById('statsBar').innerHTML = '<span class="stat-item stat-total">留痕记录: ' + result.recordsCount + ' 行 (' + result.changedCount + ' 行变更)</span><span class="stat-item stat-must">工具判为必选: ' + result.toolMustCount + ' 个章节</span><span class="stat-item stat-changed">用户输入: ' + (result.userChapters.length + result.noParamChapters.length) + ' 个章节</span>' + (result.noParamChapters.length ? '<span class="stat-item" style="background:var(--info-bg);color:var(--info)">不涉及参数修改: ' + result.noParamChapters.length + ' 个</span>' : '');
   document.getElementById('statsBar').style.display = 'flex';
 
   const colConsistent = document.getElementById('colConsistent');
@@ -899,7 +899,7 @@ function renderResults(result) {
 
   document.getElementById('resultColumns').style.display = 'grid';
 
-  // 不涉及参数变更的章节
+  // 不涉及参数修改的章节
   const noParamSection = document.getElementById('noParamSection');
   const noParamBody = document.getElementById('noParamBody');
   const countNoParam = document.getElementById('countNoParam');
@@ -973,9 +973,9 @@ function exportResult() {
     const rows4 = [['变更章节','说明']];
     for (const ch of lastResult.noParamChapters) {
       const aliases = (lastResult.noParamInputMap.get(ch) || []).filter(a => a !== ch);
-      rows4.push([ch, '不涉及参数变更' + (aliases.length ? '（用户输入：' + aliases.join(', ') + '）' : '')]);
+      rows4.push([ch, '不涉及参数修改' + (aliases.length ? '（用户输入：' + aliases.join(', ') + '）' : '')]);
     }
-    sheets.push({ name: '不涉及参数变更的章节', rows: rows4 });
+    sheets.push({ name: '不涉及参数修改的章节', rows: rows4 });
   }
 
   exportCSV(sheets);
