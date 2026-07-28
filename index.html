@@ -687,7 +687,8 @@ function matchRuleRow(ruleA, ruleBList, ruleCList, ruleD, records) {
   }
 
   const result = { chapter: getDisplayName(ruleA), rule_a: ruleA, decision: '不选', reason: '', matched_records: matchedRecords, triggered_by_b: triggeredB, triggered_by_c: triggeredC, rule_b: ruleBList, rule_c: ruleCList, rule_d: ruleD };
-  if (matchedRecords.length === 0) { result.decision = '不选'; result.reason = '留痕记录中未找到B列参数或C列类别的变更'; return result; }
+  // “其他条款（非交易过户、转让等）”B/C规则为空，需要继续走到 decide 中的特殊处理
+  if (matchedRecords.length === 0 && ruleA !== '其他条款（非交易过户、转让等）') { result.decision = '不选'; result.reason = '留痕记录中未找到B列参数或C列类别的变更'; return result; }
   const [decision, reason] = decide(ruleA, ruleBList, ruleCList, ruleD, matchedRecords, triggeredB, triggeredC);
   result.decision = decision; result.reason = reason;
   return result;
@@ -848,6 +849,23 @@ function executeComparison(userText) {
         consistentOptional.push(r);
         superfluous.splice(i, 1);
       }
+    }
+  }
+
+  // 认购/申赎条款联动例外：当认购相关条款或一般申赎条款被判为必选时，
+  // 用户勾选的“其他条款（非交易过户、转让等）”即使没有对应留痕记录，也视为合理，不判为多余。
+  const DEPENDENT_EXCEPTIONS = {
+    '其他条款（非交易过户、转让等）': ['认购相关条款', '一般申赎条款（申赎预约、申赎金额及公式、转换）']
+  };
+  const mustSelectedChapters = new Set(allResults.filter(r => r.decision === '必选').map(r => r.chapter));
+  for (let i = superfluous.length - 1; i >= 0; i--) {
+    const r = superfluous[i];
+    const depends = DEPENDENT_EXCEPTIONS[r.chapter];
+    if (depends && depends.some(dep => mustSelectedChapters.has(dep))) {
+      r.decision = '可选';
+      r.reason = '认购相关条款或一般申赎条款参数变更，该章节勾选视为合理';
+      consistentOptional.push(r);
+      superfluous.splice(i, 1);
     }
   }
 
