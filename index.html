@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build: 2026-07-28 usage-note v2 + no-cache -->
+<!-- build: 2026-07-29 copyable chapter titles + no-cache -->
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -223,7 +223,7 @@ textarea:focus { border-color: var(--primary); }
 .no-param-section .no-param-item { padding: 8px 12px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--text-secondary); }
 .no-param-section .no-param-item:last-child { margin-bottom: 0; }
 
-.chapter-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; transition: box-shadow .2s; }
+.chapter-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; transition: box-shadow .2s; user-select: text; }
 .chapter-item:hover { box-shadow: var(--shadow); }
 .chapter-header {
   padding: 10px 14px;
@@ -233,7 +233,7 @@ textarea:focus { border-color: var(--primary); }
   align-items: center;
   font-size: 13px;
   font-weight: 600;
-  user-select: none;
+  user-select: text;
 }
 .chapter-header .toggle { font-size: 12px; opacity: .6; transition: transform .2s; }
 .chapter-header .toggle.open { transform: rotate(90deg); }
@@ -952,6 +952,8 @@ function renderMissingItem(r) {
 }
 
 function toggleDetail(el) {
+  // 用户正在选中文本时，不触发折叠/展开
+  if (window.getSelection().toString().trim()) return;
   const detail = el.querySelector('.chapter-detail');
   const toggle = el.querySelector('.toggle');
   if (detail) { detail.classList.toggle('show'); if (toggle) toggle.classList.toggle('open'); }
